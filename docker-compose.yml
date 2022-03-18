@@ -1,0 +1,117 @@
+version: '3'
+
+services:
+  
+  backend:
+    build:
+      context: ./.docker/nginx
+      dockerfile: Dockerfile
+    container_name: nginx
+    ports:
+      - 8000:80
+    volumes:
+      - ./:/var/www/html:delegated
+    depends_on:
+      - php
+      - redis
+      - mysql
+      - mailhog
+    networks:
+      - application
+
+  php:
+    build:
+      context: ./.docker/php
+      dockerfile: Dockerfile
+    container_name: php
+    volumes:
+      - ./:/var/www/html:delegated
+    networks:
+      - application
+
+  composer:
+    image: composer:2
+    container_name: composer
+    volumes:
+      - ./:/var/www/html
+    working_dir: /var/www/html
+    depends_on:
+      - php
+    user: root
+    entrypoint: ['composer', '--ignore-platform-reqs']
+    networks:
+      - application
+
+  artisan:
+    build:
+      context: ./.docker/php
+      dockerfile: Dockerfile
+    container_name: artisan
+    volumes:
+      - ./:/var/www/html:delegated
+    depends_on:
+      - mysql
+    working_dir: /var/www/html
+    entrypoint: ['php', '/var/www/html/artisan']
+    networks:
+      - application
+
+  mysql:
+    image: mariadb:10.6
+    container_name: mysql
+    restart: unless-stopped
+    tty: true
+    ports:
+      - 33066:3306
+    environment:
+      MYSQL_DATABASE: homestead
+      MYSQL_USER: homestead
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: secret
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - application
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    networks:
+      - application
+
+  npm:
+    image: node:13.7
+    container_name: npm
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - 3300:3000
+      - 3301:3001
+    working_dir: /var/www/html
+    entrypoint: ['npm']
+    networks:
+      - application
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    ports:
+      - 1025:1025
+      - 8025:8025
+    networks:
+      - application
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  application:
+    driver: bridge
